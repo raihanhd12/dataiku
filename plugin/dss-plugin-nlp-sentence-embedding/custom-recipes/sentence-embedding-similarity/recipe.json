@@ -1,32 +1,24 @@
 {
     "meta": {
-        "label": "Dataset compute sentence similarity",
-        "description": "Compute similarity between two text columns (from two datasets) using sentence embeddings.",
-        "icon": " icon-github-alt"
+        "label": "Compute sentence similarity",
+        "description": "Compute the similarity of two colums of text using sentence embeddings.",
+        "icon": "icon-columns"
     },
     "kind": "PYTHON",
-    "selectableFromDataset": "baseline_dataset",
+    "selectableFromDataset": "input_dataset",
     "inputRoles": [
         {
-            "name": "baseline_dataset",
-            "label": "Baseline Dataset",
-            "description": "Dataset containing the baseline texts.",
-            "arity": "UNARY",
-            "required": true,
-            "acceptsDataset": true
-        },
-        {
-            "name": "test_dataset",
-            "label": "Test Dataset",
-            "description": "Dataset containing the test texts.",
+            "name": "input_dataset",
+            "label": "Input dataset",
+            "description": "The dataset that contains the column of interest",
             "arity": "UNARY",
             "required": true,
             "acceptsDataset": true
         },
         {
             "name": "embedding_folder",
-            "label": "Embedding Folder",
-            "description": "The folder containing the pre-trained word embeddings.",
+            "label": "Embedding folder",
+            "description": "The folder containing the pre-trained word embeddings",
             "arity": "UNARY",
             "required": true,
             "acceptsManagedFolder": true,
@@ -36,8 +28,8 @@
     "outputRoles": [
         {
             "name": "output_dataset",
-            "label": "Output Dataset",
-            "description": "A copy of the input datasets with additional columns for similarity metrics and prefixed text columns.",
+            "label": "Output dataset",
+            "description": "A copy of the input dataset with an additional column of sentence embeddings",
             "arity": "UNARY",
             "required": true,
             "acceptsDataset": true
@@ -45,24 +37,24 @@
     ],
     "params": [
         {
-            "name": "baseline_text_column",
-            "label": "Baseline Text Column",
+            "name": "text_column_1",
+            "label": "Text column 1",
             "type": "COLUMN",
-            "description": "Select the text column from the baseline dataset.",
+            "description": "",
             "mandatory": true,
-            "columnRole": "baseline_dataset"
+            "columnRole": "input_dataset"
         },
         {
-            "name": "test_text_column",
-            "label": "Test Text Column",
+            "name": "text_column_2",
+            "label": "Text column 2",
             "type": "COLUMN",
-            "description": "Select the text column from the test dataset.",
+            "description": "",
             "mandatory": true,
-            "columnRole": "test_dataset"
+            "columnRole": "input_dataset"
         },
         {
             "name": "distance",
-            "label": "Distance Metric",
+            "label": "Distance",
             "type": "SELECT",
             "mandatory": true,
             "selectChoices": [
@@ -80,14 +72,14 @@
                 },
                 {
                     "value": "wasserstein",
-                    "label": "Earth-Mover (Wasserstein) Distance"
+                    "label": "Earth-Mover Distance"
                 }
             ],
             "defaultValue": "cosine"
         },
         {
             "name": "aggregation_method",
-            "label": "Aggregation Method",
+            "label": "Aggregation method",
             "type": "SELECT",
             "mandatory": true,
             "selectChoices": [
@@ -103,15 +95,8 @@
             "defaultValue": "simple_average"
         },
         {
-            "name": "top_n",
-            "label": "Top N Matches",
-            "type": "INT",
-            "mandatory": true,
-            "defaultValue": 10
-        },
-        {
             "name": "embedding_is_custom",
-            "label": "Use Custom Embedding",
+            "label": "Use custom embedding",
             "description": "Tick this box if you are using a custom embedding.",
             "type": "BOOLEAN",
             "defaultValue": false
@@ -119,8 +104,8 @@
         {
             "visibilityCondition": "model.aggregation_method=='SIF'",
             "name": "advanced_settings",
-            "label": "Advanced SIF Settings",
-            "description": "Enable to set SIF smoothing parameters and principal components.",
+            "label": "Advanced Settings",
+            "description": "To set SIF smoothing parameters and number of components.",
             "type": "BOOLEAN",
             "defaultValue": false
         },
@@ -136,23 +121,9 @@
             "visibilityCondition": "model.advanced_settings && model.aggregation_method=='SIF'",
             "name": "n_principal_components",
             "label": "[SIF] Principal Components",
-            "description": "Number of principal components to remove in SIF computation.",
+            "description": "Number of components to remove in SIF computation.",
             "type": "INT",
             "defaultValue": 1
-        },
-        {
-            "name": "baseline_prefix",
-            "label": "Baseline Prefix",
-            "description": "Prefix to add to all columns from the baseline dataset.",
-            "type": "STRING",
-            "defaultValue": "baselinePrefix_"
-        },
-        {
-            "name": "test_prefix",
-            "label": "Test Prefix",
-            "description": "Prefix to add to all columns from the test dataset.",
-            "type": "STRING",
-            "defaultValue": "testPrefix_"
         }
     ]
 }
