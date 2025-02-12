@@ -1,27 +1,31 @@
 # -*- coding: utf-8 -*-
 import dataiku
-from dataiku.customrecipe import *
-from commons import load_pretrained_model
-
-import numpy as np
 import pandas as pd
-from scipy.stats import wasserstein_distance
-from scipy.spatial.distance import cosine, euclidean
+import numpy as np
+import os
+from sklearn.metrics.pairwise import cosine_similarity
+from gensim.models import KeyedVectors
+from dataiku.customrecipe import get_input_names_for_role, get_output_names_for_role, get_recipe_config
 import logging
 
 # Setup logging
-FORMAT = '[DATASET SENTENCE EMBEDDING] %(asctime)s - %(name)s - %(levelname)s - %(message)s'
-logging.basicConfig(format=FORMAT)
+logging.basicConfig(level=logging.INFO, 
+                    format='[Sentence Embedding Ranking] %(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
-##################################
-# Input Data
-##################################
+# ============================================
+# 1. Read Input Datasets and Specify Columns
+# ============================================
+recipe_config = get_recipe_config()
 
-# Retrieve the Baseline and Test datasets
-baseline_dataset_name = get_input_names_for_role('baseline_dataset')[0]
-test_dataset_name = get_input_names_for_role('test_dataset')[0]
+baseline_text_column = recipe_config.get("baseline_text_column")
+test_text_column = recipe_config.get("test_text_column")
+top_n = int(recipe_config.get("top_n", 10))
+model_filename = recipe_config.get("model_filename", "Word2vec_embeddings")
+
+# Retrieve input dataset names from recipe roles
+baseline_dataset_name = get_input_names_for_role("baseline_dataset")[0]
+test_dataset_name = get_input_names_for_role("test_dataset")[0]
 
 logger.info("Loading Baseline dataset: %s", baseline_dataset_name)
 df_baseline = dataiku.Dataset(baseline_dataset_name).get_dataframe()
@@ -29,135 +33,90 @@ df_baseline = dataiku.Dataset(baseline_dataset_name).get_dataframe()
 logger.info("Loading Test dataset: %s", test_dataset_name)
 df_test = dataiku.Dataset(test_dataset_name).get_dataframe()
 
-# Retrieve the embedding folder
-embedding_folder_name = get_input_names_for_role('embedding_folder')[0]
-folder_path = dataiku.Folder(embedding_folder_name).get_path()
+# Extract text columns; ensure strings and remove extra spaces
+base_texts = df_baseline[baseline_text_column].astype(str).str.strip()
+test_texts = df_test[test_text_column].astype(str).str.strip()
 
-##################################
-# Parameters
-##################################
+logger.info("Number of rows in Baseline dataset: %d", len(base_texts))
+logger.info("Number of rows in Test dataset: %d", len(test_texts))
 
-recipe_config = get_recipe_config()
+# ============================================
+# 2. Load Pre-trained Model from Dataiku Folder
+# ============================================
+embedding_folder_name = get_input_names_for_role("embedding_folder")[0]
+folder = dataiku.Folder(embedding_folder_name)
+local_folder_path = folder.get_path()
+model_file = os.path.join(local_folder_path, model_filename)
 
-# Select the text column for each dataset
-baseline_text_col = recipe_config.get('text_column_baseline', None)
-if baseline_text_col is None:
-    raise ValueError("You have not selected a text column for the Baseline Dataset.")
+logger.info("Loading pre-trained model from: %s", model_file)
+model = KeyedVectors.load_word2vec_format(model_file, binary=True)
 
-test_text_col = recipe_config.get('text_column_test', None)
-if test_text_col is None:
-    raise ValueError("You have not selected a text column for the Test Dataset.")
-
-# Distance parameter
-distance = recipe_config.get('distance', None)
-if distance is None:
-    raise ValueError("You have not selected a distance method.")
-
-# Aggregation method and custom embedding parameter
-embedding_is_custom = recipe_config.get('embedding_is_custom', False)
-aggregation_method = recipe_config.get('aggregation_method', None)
-if aggregation_method is None:
-    raise ValueError("You have not selected an aggregation method.")
-
-if aggregation_method == 'simple_average':
-    smoothing_parameter, npc = None, None
-elif aggregation_method == 'SIF':
-    advanced_settings = recipe_config.get('advanced_settings', False)
-    if advanced_settings:
-        smoothing_parameter = float(recipe_config.get('smoothing_parameter'))
-        npc = int(recipe_config.get('n_principal_components'))
+# ============================================
+# 3. Function to Generate Sentence Embedding
+# ============================================
+def get_sentence_embedding(text, model):
+    """
+    Generate an embedding for a given text by:
+      - Tokenizing the text (splitting by whitespace)
+      - Retrieving embeddings for each token (using the token as-is, lowercase, or uppercase)
+      - Returning the mean of all found token embeddings.
+    If no token embeddings are found, returns a zero vector.
+    """
+    tokens = text.split()
+    vecs = []
+    for token in tokens:
+        if token in model.key_to_index:
+            vecs.append(model[token])
+        elif token.lower() in model.key_to_index:
+            vecs.append(model[token.lower()])
+        elif token.upper() in model.key_to_index:
+            vecs.append(model[token.upper()])
+    if len(vecs) == 0:
+        return np.zeros(model.vector_size)
     else:
-        smoothing_parameter = 0.001
-        npc = 1
+        return np.mean(vecs, axis=0)
 
-# Parameter for top N ranking
-top_n = int(recipe_config.get('top_n', 10))
+# Compute embeddings for each text in the Baseline and Test datasets.
+logger.info("Computing embeddings for Baseline texts...")
+base_embeddings = base_texts.apply(lambda x: get_sentence_embedding(x, model))
+logger.info("Computing embeddings for Test texts...")
+test_embeddings = test_texts.apply(lambda x: get_sentence_embedding(x, model))
 
-##################################
-# Loading Embedding Model
-##################################
-
-logger.info("Loading pre-trained model from folder: %s", folder_path)
-model = load_pretrained_model(folder_path, embedding_is_custom)
-
-##################################
-# Compute Sentence Embeddings
-##################################
-
-logger.info("Computing embeddings for the Baseline Dataset...")
-baseline_texts = df_baseline[baseline_text_col].astype(str).tolist()
-if aggregation_method == 'simple_average':
-    baseline_embeddings = model.get_sentence_embedding(baseline_texts)
-else:
-    baseline_embeddings = model.get_weighted_sentence_embedding(baseline_texts, smoothing_parameter, npc)
-
-logger.info("Computing embeddings for the Test Dataset...")
-test_texts = df_test[test_text_col].astype(str).tolist()
-if aggregation_method == 'simple_average':
-    test_embeddings = model.get_sentence_embedding(test_texts)
-else:
-    test_embeddings = model.get_weighted_sentence_embedding(test_texts, smoothing_parameter, npc)
-
-##################################
-# Define Distance Function
-##################################
-
-if distance == "cosine":
-    distance_function = cosine
-elif distance == "euclidean":
-    distance_function = euclidean
-elif distance == "absolute":
-    def distance_function(x, y):
-        x = np.array(x)
-        y = np.array(y)
-        return np.linalg.norm(x - y, ord=1)
-elif distance == "wasserstein":
-    distance_function = wasserstein_distance
-else:
-    raise ValueError("The selected distance method is not supported.")
-
-##################################
-# Compute Pairwise Similarity
-##################################
-
-logger.info("Computing similarity for each Baseline-Test pair...")
-
+# ============================================
+# 4. Compute Cosine Similarity & Distance, Retrieve Top N Closest
+# ============================================
 results = []
-for i, emb_baseline in enumerate(baseline_embeddings):
-    for j, emb_test in enumerate(test_embeddings):
-        # Ensure the embedding is valid (contains no NaN)
-        if np.sum(np.isnan(emb_baseline)) == 0 and np.sum(np.isnan(emb_test)) == 0:
-            d = distance_function(emb_baseline, emb_test)
-        else:
-            d = np.nan
-        results.append({
-            "baseline_code": baseline_texts[i],
-            "test_code": test_texts[j],
-            "similarity_distance": d
+
+for i, base_text in enumerate(base_texts):
+    base_vec = base_embeddings.iloc[i]
+    similarity_list = []
+    for j, test_text in enumerate(test_texts):
+        test_vec = test_embeddings.iloc[j]
+        # Compute cosine similarity and derive cosine distance
+        sim = cosine_similarity(base_vec.reshape(1, -1), test_vec.reshape(1, -1))[0, 0]
+        dist = 1 - sim  # Lower distance indicates higher similarity
+        similarity_list.append({
+            "baseline_text": base_text,
+            "test_text": test_text,
+            "cosine_similarity": sim,
+            "cosine_distance": dist
         })
+    
+    # Sort pairs by cosine distance (ascending order)
+    similarity_list_sorted = sorted(similarity_list, key=lambda x: x["cosine_distance"])
+    
+    # Retrieve the top N pairs for the current baseline text
+    top_entries = similarity_list_sorted[:top_n]
+    for rank, entry in enumerate(top_entries, start=1):
+        entry["rank"] = rank  # Rank 1 means the most similar pair
+        results.append(entry)
 
-##################################
-# Sorting and Ranking
-##################################
+# ============================================
+# 5. Create Output DataFrame and Write to Dataiku Dataset
+# ============================================
+output_df = pd.DataFrame(results)
+logger.info("Total output pairs (top %d per baseline): %d", top_n, len(output_df))
 
-# Sort pairs by similarity_distance (smaller values indicate higher similarity)
-results_sorted = sorted(results, key=lambda x: x["similarity_distance"] if not np.isnan(x["similarity_distance"]) else np.inf)
-
-# Take the top N pairs
-top_results = results_sorted[:top_n]
-
-# Add ranking to the top pairs
-for rank, item in enumerate(top_results, start=1):
-    item["ranking"] = rank
-
-##################################
-# Writing Output
-##################################
-
-logger.info("Writing output with top %d pairs", top_n)
-df_out = pd.DataFrame(top_results)
-
-output_dataset_name = get_output_names_for_role('output_dataset')[0]
-dataiku.Dataset(output_dataset_name).write_with_schema(df_out)
-
+output_dataset_name = get_output_names_for_role("output_dataset")[0]
+dataiku.Dataset(output_dataset_name).write_with_schema(output_df)
 logger.info("Done.")

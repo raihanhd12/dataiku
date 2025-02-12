@@ -1,7 +1,7 @@
 {
     "meta": {
         "label": "Dataset Sentence Embedding Ranking",
-        "description": "Compare each code in the Baseline Dataset with every code in the Test Dataset, sort by similarity distance, and display the top N pairs.",
+        "description": "Compare each text in the Baseline Dataset with every text in the Test Dataset by computing their cosine similarity. For each baseline text, the recipe selects the top N most similar test texts based on cosine distance.",
         "icon": "icon-columns"
     },
     "kind": "PYTHON",
@@ -9,7 +9,7 @@
         {
             "name": "baseline_dataset",
             "label": "Baseline Dataset",
-            "description": "Dataset containing the baseline codes.",
+            "description": "Dataset containing the original texts.",
             "arity": "UNARY",
             "required": true,
             "acceptsDataset": true
@@ -17,7 +17,7 @@
         {
             "name": "test_dataset",
             "label": "Test Dataset",
-            "description": "Dataset containing the codes to be compared.",
+            "description": "Dataset containing the texts to be compared.",
             "arity": "UNARY",
             "required": true,
             "acceptsDataset": true
@@ -25,7 +25,7 @@
         {
             "name": "embedding_folder",
             "label": "Embedding Folder",
-            "description": "Folder containing the pre-trained word embeddings.",
+            "description": "Folder containing the pre-trained embedding model file.",
             "arity": "UNARY",
             "required": true,
             "acceptsManagedFolder": true,
@@ -36,7 +36,7 @@
         {
             "name": "output_dataset",
             "label": "Output Dataset",
-            "description": "Table containing the code pairs (Baseline – Test) along with similarity distances and ranking.",
+            "description": "Table containing text pairs (Baseline – Test) with cosine similarity, cosine distance and ranking.",
             "arity": "UNARY",
             "required": true,
             "acceptsDataset": true
@@ -44,101 +44,36 @@
     ],
     "params": [
         {
-            "name": "text_column_baseline",
-            "label": "Baseline Dataset Text Column",
+            "name": "baseline_text_column",
+            "label": "Baseline Text Column",
             "type": "COLUMN",
-            "description": "Select the column containing the codes or text in the Baseline Dataset.",
+            "description": "Select the column containing the original text in the Baseline Dataset.",
             "mandatory": true,
             "columnRole": "baseline_dataset"
         },
         {
-            "name": "text_column_test",
-            "label": "Test Dataset Text Column",
+            "name": "test_text_column",
+            "label": "Test Text Column",
             "type": "COLUMN",
-            "description": "Select the column containing the codes or text in the Test Dataset.",
+            "description": "Select the column containing the test text in the Test Dataset.",
             "mandatory": true,
             "columnRole": "test_dataset"
         },
         {
-            "name": "distance",
-            "label": "Distance",
-            "type": "SELECT",
-            "mandatory": true,
-            "selectChoices": [
-                {
-                    "value": "cosine",
-                    "label": "Cosine Distance"
-                },
-                {
-                    "value": "euclidean",
-                    "label": "Euclidean Distance"
-                },
-                {
-                    "value": "absolute",
-                    "label": "Absolute Distance"
-                },
-                {
-                    "value": "wasserstein",
-                    "label": "Earth-Mover Distance"
-                }
-            ],
-            "defaultValue": "cosine"
-        },
-        {
-            "name": "aggregation_method",
-            "label": "Aggregation Method",
-            "type": "SELECT",
-            "mandatory": true,
-            "selectChoices": [
-                {
-                    "value": "simple_average",
-                    "label": "Simple Average"
-                },
-                {
-                    "value": "SIF",
-                    "label": "SIF Embedding"
-                }
-            ],
-            "defaultValue": "simple_average"
-        },
-        {
-            "name": "embedding_is_custom",
-            "label": "Use Custom Embedding",
-            "description": "Check if using a custom embedding.",
-            "type": "BOOLEAN",
-            "defaultValue": false
-        },
-        {
-            "visibilityCondition": "model.aggregation_method=='SIF'",
-            "name": "advanced_settings",
-            "label": "Advanced Settings",
-            "description": "Set the smoothing parameter and the number of principal components for SIF.",
-            "type": "BOOLEAN",
-            "defaultValue": false
-        },
-        {
-            "visibilityCondition": "model.advanced_settings && model.aggregation_method=='SIF'",
-            "name": "smoothing_parameter",
-            "label": "[SIF] Smoothing Parameter",
-            "description": "Smoothing parameter for SIF computation.",
-            "type": "DOUBLE",
-            "defaultValue": 0.001
-        },
-        {
-            "visibilityCondition": "model.advanced_settings && model.aggregation_method=='SIF'",
-            "name": "n_principal_components",
-            "label": "[SIF] Principal Components",
-            "description": "Number of components to remove in SIF computation.",
-            "type": "INT",
-            "defaultValue": 1
+            "name": "model_filename",
+            "label": "Model Filename",
+            "type": "STRING",
+            "description": "Name of the model file within the embedding folder (e.g., 'Word2vec_embeddings').",
+            "mandatory": false,
+            "defaultValue": "Word2vec_embeddings"
         },
         {
             "name": "top_n",
             "label": "Top N Pairs",
-            "description": "Number of top pairs (with the smallest similarity distance) to display.",
             "type": "INT",
-            "defaultValue": 10,
-            "mandatory": true
+            "description": "Number of top pairs (with the lowest cosine distance) to output for each Baseline text.",
+            "mandatory": true,
+            "defaultValue": 10
         }
     ]
 }

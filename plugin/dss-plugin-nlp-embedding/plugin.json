@@ -6,7 +6,7 @@
         "category": "Natural Language Processing",
         "description": "Compute numerical representations for text data so that they can be fed to ML algorithms",
         "author": "Dataiku (Hicham El Boukkouri) & Modified By: Raihan Hidayayullah Djunaedi",
-        "icon": "fa-regular fa-registered",
+        "icon": "icon-columns",
         "licenseInfo": "Apache Software License",
         "url": "https://www.dataiku.com/product/plugins/sentence-embedding/",
         "tags": [

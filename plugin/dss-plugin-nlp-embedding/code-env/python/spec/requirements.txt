@@ -7,3 +7,4 @@ tensorflow>=2.1,<=2.11.1
 tensorflow-hub==0.7.0
 grpcio==1.39.0; python_version <= '3.6'
 grpcio==1.54.0; python_version >= '3.7'
+scipy==1.7.3
