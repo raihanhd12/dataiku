@@ -2,7 +2,7 @@
     "meta": {
         "label": "Compute Sentence Similarity",
         "description": "Compute similarity between two text columns (from two datasets) using sentence embeddings.",
-        "icon": "icon-columns"
+        "icon": " icon-github-alt"
     },
     "kind": "PYTHON",
     "selectableFromDataset": "baseline_dataset",
