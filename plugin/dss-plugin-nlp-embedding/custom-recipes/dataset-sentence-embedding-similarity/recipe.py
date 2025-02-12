@@ -182,9 +182,9 @@ for i, (base_text, base_emb) in enumerate(zip(baseline_texts, baseline_embedding
         pair_dict.update(baseline_row_prefixed)
         pair_dict.update(test_row_prefixed)
         pair_dict[f"{baseline_prefix}test_distance"] = dist
-        if distance_metric == "cosine":
-            # cosine_similarity = 1 - cosine_distance
-            pair_dict[f"{baseline_prefix}test_cosine_similarity"] = 1 - dist
+        # if distance_metric == "cosine":
+        #     # cosine_similarity = 1 - cosine_distance
+        #     pair_dict[f"{baseline_prefix}test_cosine_similarity"] = 1 - dist
         pair_dict[f"{baseline_prefix}index_baseline"] = i
         pair_dict[f"{test_prefix}index_test"] = j
         
